@@ -8,7 +8,7 @@ import { ac, admin, manager, user, partner } from "@/lib/auth-permissions";
 import { newUserNotify } from "@/lib/new-user-notify";
 import resendHelper from "@/lib/resend";
 
-const isDemo = process.env.NEXT_PUBLIC_APP_URL === "https://demo.nextcrm.io";
+const isDemo = process.env.DEMO_MODE === "true" || process.env.NEXT_PUBLIC_APP_URL === "https://demo.nextcrm.io";
 
 const asgardeoClientId = process.env.ASGARDEO_CLIENT_ID;
 const asgardeoClientSecret = process.env.ASGARDEO_CLIENT_SECRET;
@@ -131,22 +131,28 @@ export const auth = betterAuth({
     },
   },
 
-  callbacks: {
-    async onUserCreated(user: { id: string }) {
-      // Check if this is the first user — make them admin
-      const count = await prismadb.users.count();
-      if (count === 1) {
-        await prismadb.users.update({
-          where: { id: user.id },
-          data: { role: "admin", userStatus: "ACTIVE" },
-        });
-      } else if (!isDemo) {
-        // Notify admins about new pending user
-        const dbUser = await prismadb.users.findUnique({ where: { id: user.id } });
-        if (dbUser) {
-          await newUserNotify(dbUser);
-        }
-      }
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          const count = await prismadb.users.count();
+
+          if (count === 1) {
+            await prismadb.users.update({
+              where: { id: user.id },
+              data: { role: "admin", userStatus: "ACTIVE" },
+            });
+          } else if (!isDemo) {
+            const dbUser = await prismadb.users.findUnique({
+              where: { id: user.id },
+            });
+
+            if (dbUser) {
+              await newUserNotify(dbUser);
+            }
+          }
+        },
+      },
     },
   },
 });
