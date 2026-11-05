@@ -142,7 +142,12 @@ export const auth = betterAuth({
               where: { id: user.id },
               data: { role: "admin", userStatus: "ACTIVE" },
             });
-          } else if (!isDemo) {
+          } else if (isDemo) {
+            await prismadb.users.update({
+              where: { id: user.id },
+              data: { userStatus: "ACTIVE" },
+            });
+          } else {
             const dbUser = await prismadb.users.findUnique({
               where: { id: user.id },
             });
